@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planit! Study Planner</title>
+
+<style>
+body { font-family: Arial, sans-serif; background: #0f172a; color: white; margin: 0; }
+header { text-align: center; padding: 20px; background: #020617; }
+.container { padding: 20px; }
+
+select, button { padding: 8px; border-radius: 6px; margin-top: 10px; border: none; }
+button { background: #38bdf8; cursor: pointer; }
+
+/* Tabs */
+.tabs { display: flex; gap: 10px; margin-top: 20px; }
+.tab { padding: 10px 15px; background: #020617; border-radius: 8px; cursor: pointer; transition: 0.3s; }
+.tab.active { background: #38bdf8; color: black; }
+.indicator { margin-left: 6px; font-size: 12px; }
+
+/* Animated Sections */
+.section { opacity: 0; transform: translateY(10px); pointer-events: none; transition: all 0.3s ease; }
+.section.active { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+.section-box { background: #020617; padding: 15px; border-radius: 10px; }
+textarea { width: 100%; padding: 10px; border-radius: 6px; border: none; }
+
+/* Calendar */
+.calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-top: 20px; }
+.day { background: #020617; padding: 10px; border-radius: 8px; min-height: 80px; cursor: pointer; position: relative; }
+.day:hover { background: #1e293b; }
+
+.tick {
+  position: absolute;
+  top: 5px;
+  right: 8px;
+  font-size: 14px;
+  color: #22c55e;
+}
+
+/* Modal */
+.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); justify-content: center; align-items: center; }
+.modal-content { background: #020617; padding: 20px; border-radius: 10px; width: 300px; }
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>✨ Planit!</h1>
+  <p>Your Digital Study Planner</p>
+</header>
+
+<div class="container">
+
+  <label>Select Month:</label>
+  <select id="month-select" onchange="changeMonth()">
+    <option>January</option><option>February</option><option>March</option><option>April</option>
+    <option>May</option><option>June</option><option>July</option><option>August</option>
+    <option>September</option><option>October</option><option>November</option><option>December</option>
+  </select>
+
+  <button onclick="clearMonth()">🗑 Clear Month</button>
+
+  <div class="tabs">
+    <div class="tab active" onclick="openSection(event,'goals')">🎯 Goals <span id="goal-ind" class="indicator"></span></div>
+    <div class="tab" onclick="openSection(event,'reflection')">🧠 Reflection <span id="ref-ind" class="indicator"></span></div>
+  </div>
+
+  <div id="goals" class="section active">
+    <div class="section-box">
+      <textarea id="goals-input" placeholder="Write your goals..."></textarea>
+    </div>
+  </div>
+
+  <div id="reflection" class="section">
+    <div class="section-box">
+      <textarea id="reflection-input" placeholder="How was your progress?"></textarea>
+    </div>
+  </div>
+
+  <h2>📅 Monthly Planner</h2>
+  <div class="calendar" id="calendar"></div>
+
+</div>
+
+<div class="modal" id="modal">
+  <div class="modal-content">
+    <h3 id="modal-date"></h3>
+    <textarea id="task-input"></textarea>
+    <button onclick="saveTask()">Save</button>
+    <button onclick="closeModal()">Close</button>
+  </div>
+</div>
+
+<script>
+const calendar = document.getElementById("calendar");
+const modal = document.getElementById("modal");
+const modalDate = document.getElementById("modal-date");
+const taskInput = document.getElementById("task-input");
+const monthSelect = document.getElementById("month-select");
+
+let selectedDay = null;
+let currentMonth = monthSelect.value;
+
+const monthIndex = {
+  January:0, February:1, March:2, April:3, May:4, June:5,
+  July:6, August:7, September:8, October:9, November:10, December:11
+};
+
+function openSection(e,id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  e.target.classList.add('active');
+}
+
+function generateCalendar() {
+  calendar.innerHTML = "";
+
+  const today = new Date();
+  const currentYear = today.getFullYear();
+
+  for (let i = 1; i <= 31; i++) {
+    const day = document.createElement("div");
+    day.className = "day";
+
+    let tick = "";
+
+    const selectedMonthIndex = monthIndex[currentMonth];
+    if (
+      selectedMonthIndex < today.getMonth() ||
+      (selectedMonthIndex === today.getMonth() && i < today.getDate())
+    ) {
+      tick = "✔";
+    }
+
+    day.innerHTML = `<strong>${i}</strong><span class="tick">${tick}</span><br><span id="task-${i}"></span>`;
+
+    day.onclick = () => openModal(i);
+    calendar.appendChild(day);
+  }
+
+  loadTasks();
+}
+
+function changeMonth() {
+  currentMonth = monthSelect.value;
+  generateCalendar();
+  loadExtra();
+}
+
+function openModal(day) {
+  selectedDay = day;
+  modal.style.display = "flex";
+  modalDate.innerText = `${currentMonth} - Day ${day}`;
+  taskInput.value = localStorage.getItem(currentMonth + "-task-" + day) || "";
+}
+
+function closeModal() { modal.style.display = "none"; }
+
+function saveTask() {
+  localStorage.setItem(currentMonth + "-task-" + selectedDay, taskInput.value);
+  document.getElementById("task-" + selectedDay).innerText = taskInput.value;
+  closeModal();
+}
+
+function loadTasks() {
+  for (let i = 1; i <= 31; i++) {
+    const saved = localStorage.getItem(currentMonth + "-task-" + i);
+    if (saved) document.getElementById("task-" + i).innerText = saved;
+  }
+}
+
+function loadExtra() {
+  const goals = localStorage.getItem(currentMonth + "-goals") || "";
+  const reflection = localStorage.getItem(currentMonth + "-reflection") || "";
+
+  document.getElementById("goals-input").value = goals;
+  document.getElementById("reflection-input").value = reflection;
+
+  document.getElementById("goal-ind").innerText = goals ? "✔" : "";
+  document.getElementById("ref-ind").innerText = reflection ? "✔" : "";
+}
+
+function clearMonth() {
+  if (!confirm("Clear all data for this month?")) return;
+
+  for (let i = 1; i <= 31; i++) {
+    localStorage.removeItem(currentMonth + "-task-" + i);
+  }
+  localStorage.removeItem(currentMonth + "-goals");
+  localStorage.removeItem(currentMonth + "-reflection");
+
+  generateCalendar();
+  loadExtra();
+}
+
+setInterval(() => {
+  const goalsVal = document.getElementById("goals-input").value;
+  const refVal = document.getElementById("reflection-input").value;
+
+  localStorage.setItem(currentMonth + "-goals", goalsVal);
+  localStorage.setItem(currentMonth + "-reflection", refVal);
+
+  document.getElementById("goal-ind").innerText = goalsVal ? "✔" : "";
+  document.getElementById("ref-ind").innerText = refVal ? "✔" : "";
+}, 1000);
+
+window.onload = () => {
+  generateCalendar();
+  loadExtra();
+};
+</script>
+
+</body>
+</html>
